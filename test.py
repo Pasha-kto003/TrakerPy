@@ -4,7 +4,7 @@ import datetime
 class Tracker:
     def __init__(self):
         self.records = []
-        self.income_categories = []  # Список категорий доходов
+        self.income_categories = []
         self.expense_categories = ['Еда', 'Транспорт', 'Развлечения']
 
     def add_record(self, amount, category, date, description, record_type):
@@ -88,10 +88,27 @@ class Tracker:
         else:
             print(f"Категория '{category}' уже существует.")
 
+    def show_income_expense_ratio(self):
+        income = sum(r['amount'] for r in self.records if r['type'] == 'доход')
+        expenses = sum(r['amount'] for r in self.records if r['type'] == 'расход')
+        if expenses == 0:
+            ratio = float('inf') # на ноль не делим
+        else:
+            ratio = expenses / income
+
+        print(f"Доходы: {income:.2f}, Расходы: {expenses:.2f}, Соотношение доходов к расходам: {ratio:.2f}")
+
+        if ratio < 1:
+            print("Доходы больше расходов.")
+        elif ratio > 1:
+            print("Расходы превышают доходы.")
+        else:
+            print("Доходы и расходы равны.")
+
     def add_expense_category(self):
         category = input("Введите новую категорию расходов: ")
         if category not in self.expense_categories:
-            self.expense_categories.append(category)  # Добавляем категорию в список
+            self.expense_categories.append(category)
             print(f"Категория '{category}' добавлена в список расходов.")
         else:
             print(f"Категория '{category}' уже существует.")
@@ -118,11 +135,12 @@ def main():
         print("7. Добавить категорию расходов")
         print("8. Показать категории")
         print("9. Просмотр с фильтром")
-        print("10. Выйти")
+        print("10. Соотношение расходов и доходов")
+        print('11. Выход')
 
         choice = input("Выберите действие: ")
 
-        if choice == '1':  # Добавление дохода
+        if choice == '1':
             print("Доступные категории доходов:", tracker.income_categories)
             category = input("Выберите категорию дохода: ")
             if category not in tracker.income_categories:
@@ -144,24 +162,24 @@ def main():
             description = input("Введите описание: ")
             tracker.add_record(amount, category, date, description, 'расход')
 
-        elif choice == '3':  # Показать баланс
+        elif choice == '3':
             tracker.show_balance()
 
-        elif choice == '4':  # Просмотр за период
+        elif choice == '4':
             start_date = input("Введите начальную дату (ГГГГ-ММ-ДД): ")
             end_date = input("Введите конечную дату (ГГГГ-ММ-ДД): ")
             tracker.view_period(start_date, end_date)
 
-        elif choice == '5':  # Анализ расходов по категориям
+        elif choice == '5':
             tracker.analyze_expenses()
 
-        elif choice == '6':  # Добавление категории доходов
+        elif choice == '6':
             tracker.add_income_category()
 
-        elif choice == '7':  # Добавление категории расходов
+        elif choice == '7':
             tracker.add_expense_category()
 
-        elif choice == '8':  # Показать категории
+        elif choice == '8':
             tracker.show_categories()
 
         elif choice == '9':
@@ -174,7 +192,11 @@ def main():
 
             tracker.view_period_category(start_date, end_date, category)
 
-        elif choice == '10':  # Выход
+        elif choice == '10':
+            print('Соотношение расходов и доходов:')
+            tracker.show_income_expense_ratio()
+
+        elif choice == '11':
             print("Выход из программы...")
             break
 
