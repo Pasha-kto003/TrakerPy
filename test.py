@@ -1,25 +1,37 @@
 import datetime
+import json
+import os
+
+from DateManager import DateConverter
+from JsonLogic import JsonManager
 
 
 class Tracker:
-    def __init__(self):
-        self.records = []
-        self.income_categories = []
-        self.expense_categories = ['Еда', 'Транспорт', 'Развлечения']
+    def __init__(self, json_file = 'records.json'):
+        self.json_manager = JsonManager(json_file)
+        self.records = self.json_manager.load_records()
+        self.income_categories = {'Зарплата', 'Подарочки', 'Вклады'}
+        self.expense_categories = {'Еда', 'Транспорт', 'Развлечения'}
 
     def add_record(self, amount, category, date, description, record_type):
         if record_type == 'расход' and not self.can_afford(amount):
             print(f"Ошибка: недостаточно средств для расхода на сумму {amount:.2f}.")
             return
 
+        record_date = DateConverter.convert_to_date(date)
+        if not record_date:
+            return
+
         record = {
             'amount': amount,
             'category': category,
-            'date': date,
+            'date': record_date.strftime("%Y-%m-%d"),
             'description': description,
             'type': record_type
         }
+
         self.records.append(record)
+        self.json_manager.save_records(self.records)
         print("Запись добавлена.")
 
     def can_afford(self, expense_amount):
@@ -35,28 +47,26 @@ class Tracker:
         print(f"Баланс: {balance:.2f} (Доходы: {income:.2f}, Расходы: {expenses:.2f})")
 
     def view_period(self, start_date, end_date):
-        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-        print(f"Записи с {start_date.date()} по {end_date.date()}:")
-        for record in self.records:
-            record_date = datetime.datetime.strptime(record['date'], "%Y-%m-%d")
-            if start_date <= record_date <= end_date:
-                print(
-                    f"{record['date']} | {record['type']} | {record['category']} | {record['amount']} | {record['description']}")
+        start_date = DateConverter.convert_to_date(start_date)
+        end_date = DateConverter.convert_to_date(end_date)
+        if not start_date or not end_date:
+            return
+        if start_date and end_date:
+            print(f"Записи с {start_date.date()} по {end_date.date()}:")
+            for record in self.records:
+                record_date = DateConverter.convert_to_date(record['date'])
+                if start_date <= record_date <= end_date:
+                    print(f"{record['date']} | {record['type']} | {record['category']} | {record['amount']} | {record['description']}")
 
     def view_period_category(self, start_date, end_date, selected_category):
-        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-        print(f"Записи с {start_date.date()} по {end_date.date()}: с категорией {selected_category}")
-        r = 0
-        for record in self.records:
-            record_date = datetime.datetime.strptime(record['date'], "%Y-%m-%d")
-            if start_date <= record_date <= end_date and record['category'] == selected_category:
-                print(
-                    f"{record['date']} | {record['type']} | {record['category']} | {record['amount']} | {record['description']}")
-            if selected_category in self.income_categories:
-                r = float(sum(record['amount']))
-        print(f'Сумма по Доходам: {r}')
+        start_date = DateConverter.convert_to_date(start_date)
+        end_date = DateConverter.convert_to_date(end_date)
+        if start_date and end_date:
+            print(f"Записи с {start_date.date()} по {end_date.date()}: с категорией {selected_category}")
+            for record in self.records:
+                record_date = DateConverter.convert_to_date(record['date'])
+                if start_date <= record_date <= end_date and record['category'] == selected_category:
+                    print(f"{record['date']} | {record['type']} | {record['category']} | {record['amount']} | {record['description']}")
 
     def analyze_expenses(self):
         categories_expenses = {}
@@ -81,22 +91,19 @@ class Tracker:
             print(f"{category}: {total:.2f}")
 
     def add_income_category(self):
-        category = input("Введите новую категорию доходов: ")
-        if category not in self.income_categories:
-            self.income_categories.append(category)
+        category = input("Введите новую категорию доходов: ").strip()
+        if category and category not in self.income_categories:
+            self.income_categories.add(category)
             print(f"Категория '{category}' добавлена в список доходов.")
         else:
-            print(f"Категория '{category}' уже существует.")
+            print(f"Категория '{category}' уже существует или не указана.")
 
     def show_income_expense_ratio(self):
         income = sum(r['amount'] for r in self.records if r['type'] == 'доход')
         expenses = sum(r['amount'] for r in self.records if r['type'] == 'расход')
-        if expenses == 0:
-            ratio = float('inf') # на ноль не делим
-        else:
-            ratio = expenses / income
+        ratio = expenses / income if income != 0 else float('inf')
 
-        print(f"Доходы: {income:.2f}, Расходы: {expenses:.2f}, Соотношение доходов к расходам: {ratio:.2f}")
+        print(f"Доходы: {income:.2f}, Расходы: {expenses:.2f}, Соотношение расходов к доходу: {ratio:.2f}")
 
         if ratio < 1:
             print("Доходы больше расходов.")
@@ -106,19 +113,31 @@ class Tracker:
             print("Доходы и расходы равны.")
 
     def add_expense_category(self):
-        category = input("Введите новую категорию расходов: ")
-        if category not in self.expense_categories:
-            self.expense_categories.append(category)
+        category = input("Введите новую категорию расходов: ").strip()
+        if category and category not in self.expense_categories:
+            self.expense_categories.add(category)
             print(f"Категория '{category}' добавлена в список расходов.")
         else:
-            print(f"Категория '{category}' уже существует.")
+            print(f"Категория '{category}' уже существует или не указана.")
 
     def show_categories(self):
         print("Доступные категории доходов:")
         print(self.income_categories if self.income_categories else "Нет категорий доходов.")
 
         print("\nДоступные категории расходов:")
-        print(self.expense_categories)
+        print(self.expense_categories if self.expense_categories else "Нет категорий расходов.")
+
+    def read_records_from_json(self):
+        records = self.json_manager.load_records()
+        if records:
+            print("\nВсе записи из JSON файла:")
+            for record in records:
+                print(
+                    f"{record['date']} | {record['type']} | {record['category']} | {record['amount']} | {record['description']}")
+        else:
+            print("Нет данных в файле.")
+
+
 
 
 def main():
@@ -136,7 +155,8 @@ def main():
         print("8. Показать категории")
         print("9. Просмотр с фильтром")
         print("10. Соотношение расходов и доходов")
-        print('11. Выход')
+        print("11. Чтение данных с JSON")
+        print('12. Выход')
 
         choice = input("Выберите действие: ")
 
@@ -151,7 +171,7 @@ def main():
             description = input("Введите описание: ")
             tracker.add_record(amount, category, date, description, 'доход')
 
-        elif choice == '2':  # Добавление расхода
+        elif choice == '2':
             print("Доступные категории расходов:", tracker.expense_categories)
             category = input("Выберите категорию расхода: ")
             if category not in tracker.expense_categories:
@@ -189,15 +209,19 @@ def main():
             start_date = input("Введите начальную дату (ГГГГ-ММ-ДД): ")
             end_date = input("Введите конечную дату (ГГГГ-ММ-ДД): ")
             category = input('Выберите категорию расходов или доходов: ')
-
             tracker.view_period_category(start_date, end_date, category)
 
         elif choice == '10':
             print('Соотношение расходов и доходов:')
             tracker.show_income_expense_ratio()
 
+
         elif choice == '11':
-            print("Выход из программы...")
+            tracker.read_records_from_json()
+
+
+        elif choice == '12':
+            print("Выход из программы.")
             break
 
         else:
